@@ -24,21 +24,14 @@ def import_data(fisher):
         phenotypic = pd.read_csv(r'/Users/rodrigo/Post-Grad/CC400/phenotypic200.csv',index_col=['Institution','Subject'])
     return df,phenotypic
 
-def correlation_matrix(size, corr, diag=1):
-    corr_matrix = np.zeros((size,size))
-    cont = 0
 
-    for i in range(size):
-        for j in range(i, size):
-            if i == j:
-                corr_matrix[i,j] = diag #float('nan')
+def reconstruct_symmetric_matrix(size, upper_triangle_array, diag=1):
 
-
-            else:
-                corr_matrix[i,j] = corr[cont]
-                corr_matrix[j,i] = corr[cont]
-                cont += 1 
-    return corr_matrix
+    result = np.zeros((size, size))
+    result[np.triu_indices_from(result, 1)] = upper_triangle_array
+    result = result + result.T
+    np.fill_diagonal(result, diag)
+    return result
 
 
 def compute_KNN_graph(matrix, k_degree=10):
@@ -77,7 +70,7 @@ def adjacency(dist, idx):
     return W.todense()
 
 
-def create_graph(X_train, X_test, y_train, y_test):
+def create_graph(X_train, X_test, y_train, y_test, method={'knn' : 10}):
     
     train_data = []
     val_data = []
@@ -86,16 +79,25 @@ def create_graph(X_train, X_test, y_train, y_test):
     for i in range((X_train.shape[0])):
         
         # Transforming into a correlation matrix
-        Adj = correlation_matrix(190,X_train.iloc[i,:].values)     
+        Adj = reconstruct_symmetric_matrix(190,X_train.iloc[i,:].values)     
         
         # Copying the Adj matrix for operations to define edge_index
         A = Adj.copy()
         
         Adj = torch.from_numpy(Adj).float()
+        
+        if method == None:
+            A = A
 
-        # Using k-NN to define Edges
-        A = compute_KNN_graph(A, 15)
-                
+        elif list(method.keys())[0] =='knn':
+            # Using k-NN to define Edges
+            A = compute_KNN_graph(A, 10)
+
+        elif list(method.keys())[0] =='threshold':
+            A[A < method['threshold']] = 0
+            Adj[Adj < method['threshold']] = 0
+
+
         # Adding self connections
         np.fill_diagonal(A,1)
         A = torch.from_numpy(A).float()
@@ -111,15 +113,24 @@ def create_graph(X_train, X_test, y_train, y_test):
     for i in range((X_test.shape[0])):
         
         # Transforming into a correlation matrix
-        Adj = correlation_matrix(190,X_test.iloc[i,:].values)     
+        Adj = reconstruct_symmetric_matrix(190,X_test.iloc[i,:].values)     
         
         # Copying the Adj matrix for operations to define edge_index
         A = Adj.copy()
                 
         Adj = torch.from_numpy(Adj).float()
         
-        # Using k-NN to define Edges
-        A = compute_KNN_graph(A, 15)
+        if method == None:
+            A = A   
+        
+        elif list(method.keys())[0] =='knn':
+            # Using k-NN to define Edges
+            A = compute_KNN_graph(A, 10)
+            
+        elif list(method.keys())[0] =='threshold':
+            A[A < method['threshold']] = 0
+            Adj[Adj < method['threshold']] = 0
+          
         
         # Adding self connections
         np.fill_diagonal(A,1)
@@ -136,9 +147,9 @@ def create_graph(X_train, X_test, y_train, y_test):
 
 def create_batch(train_data, val_data, batch_size):
     
-    train_loader = DataLoader(train_data, batch_size, shuffle=True)
+    train_loader = DataLoader(train_data, batch_size) #Shuffle=True
 
-    val_loader = DataLoader(val_data, shuffle=True)
+    val_loader = DataLoader(val_data)  # Shuffle=True
     
     return train_loader, val_loader
     
