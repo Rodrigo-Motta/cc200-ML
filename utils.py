@@ -91,11 +91,14 @@ def create_graph(X_train, X_test, y_train, y_test, method={'knn' : 10}):
 
         elif list(method.keys())[0] =='knn':
             # Using k-NN to define Edges
-            A = compute_KNN_graph(A, 10)
+            A = compute_KNN_graph(A, method['knn'])
 
         elif list(method.keys())[0] =='threshold':
             A[A < method['threshold']] = 0
             Adj[Adj < method['threshold']] = 0
+            
+        elif list(method.keys())[0] == 'knn_group':
+            A = method['knn_group']
 
 
         # Adding self connections
@@ -125,11 +128,14 @@ def create_graph(X_train, X_test, y_train, y_test, method={'knn' : 10}):
         
         elif list(method.keys())[0] =='knn':
             # Using k-NN to define Edges
-            A = compute_KNN_graph(A, 10)
+            A = compute_KNN_graph(A, method['knn'])
             
         elif list(method.keys())[0] =='threshold':
             A[A < method['threshold']] = 0
             Adj[Adj < method['threshold']] = 0
+            
+        elif list(method.keys())[0] == 'knn_group':
+            A = method['knn_group']
           
         
         # Adding self connections
