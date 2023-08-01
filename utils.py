@@ -13,6 +13,10 @@ from sklearn.model_selection import cross_validate
 from tqdm import tqdm
 from torch_geometric.loader import DataLoader
 from sklearn.metrics import roc_curve, auc
+from neurocombat_sklearn import CombatModel
+
+np.random.seed(42)
+
 
 
 def import_data(fisher):
@@ -20,6 +24,7 @@ def import_data(fisher):
         df = pd.read_csv(r'/Users/rodrigo/Post-Grad/CC400/corr_matrices_fisher200.csv',index_col=['Institution','Subject'])
         phenotypic = pd.read_csv(r'/Users/rodrigo/Post-Grad/CC400/phenotypic200.csv',index_col=['Institution','Subject'])
     else:
+        #df = pd.read_csv(r'/Users/rodrigo/Post-Grad/CC400/corr_matrices200_half.csv',index_col=['Institution','Subject','Run'])
         df = pd.read_csv(r'/Users/rodrigo/Post-Grad/CC400/corr_matrices200.csv',index_col=['Institution','Subject','Run'])
         phenotypic = pd.read_csv(r'/Users/rodrigo/Post-Grad/CC400/phenotypic200.csv',index_col=['Institution','Subject'])
     return df,phenotypic
@@ -169,3 +174,49 @@ def create_batch(train_data, val_data, batch_size):
     
     return train_loader, val_loader
     
+def cross_val_data(df, folds=10, site=True):
+    X_train_final = []
+    y_train_final = []
+    X_test_final = []
+    y_test_final = []
+    
+    arr = df['Subject'].unique()
+    #np.random.shuffle(arr)
+    kfold = np.array_split(arr, folds)
+    
+    for i in range(folds):
+        test_loss_hist = 0
+
+        df_train = df[~df.Subject.isin(kfold[i])]
+        df_test = df[df.Subject.isin(kfold[i])]
+
+
+        Site_train = df_train[['Site']]
+        X_train = df_train.drop(columns=['Institution', 'Subject', 'Run','Gender', 'Age', 'Site'])#,'Half'])
+        y_train = df_train.Gender
+
+        Site_test = df_test[['Site']]
+        X_test = df_test.drop(columns=['Institution', 'Subject', 'Run', 'Gender', 'Age', 'Site'])#, 'Half'])
+        y_test = df_test.Gender
+        
+        y_train_final.append(y_train)
+        y_test_final.append(y_test)
+        
+        if site == True:
+
+            # Creating model
+            combat = CombatModel()
+
+            # Fitting the model and transforming the training set
+            X_train_final.append(combat.fit_transform(X_train.values,
+                                                     Site_train)) #X_train_har
+
+            # Harmonize test set using training set fitted parameters
+            X_test_final.append(combat.transform(X_test.values,
+                                                Site_test)) #X_test_har
+            
+        else:
+            X_train_final.append(X_train.values)
+            X_test_final.append(X_test.values)
+        
+    return X_train_final, y_train_final, X_test_final, y_test_final
