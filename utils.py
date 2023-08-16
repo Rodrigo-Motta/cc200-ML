@@ -48,9 +48,31 @@ def reconstruct_symmetric_matrix(size, upper_triangle_array, diag=1):
     np.fill_diagonal(result, diag)
     return result
 
+def DMN_extraction(df):
+    '''
+    '''
+    ROI_labels_dmn = pd.read_csv('/Users/rodrigo/Post-Grad/CC400/ROI_labels_DMN - ROI_labels.csv.csv')
+    ROI_labels_dmn = ROI_labels_dmn.dropna()
+    ROI_labels = pd.read_csv('/Users/rodrigo/Post-Grad/CC400/ROI_labels.csv')
+    ROI_labels = ROI_labels[ROI_labels.TIME_COURSES == True]
+    ROI_labels['NEW_LABEL'] = np.arange(0,len(ROI_labels),1)
+    ROI_labels_dmn = ROI_labels.merge(
+        ROI_labels_dmn, left_on='ROI number', right_on='ROI number', how='inner')
+    roi_labels = ROI_labels_dmn['NEW_LABEL'].values# Adjust these labels as needed
+    arr_aux = np.zeros((len(df), int((len(ROI_labels_dmn)**2 - len(ROI_labels_dmn))/2) ))
+    for i in range(len(df)):
+        aux = (pd.DataFrame(
+            reconstruct_symmetric_matrix(190,df.iloc[i].values))
+               .loc[roi_labels,roi_labels])
+        aux = remove_triangle(aux)
+        arr_aux[i] = aux.ravel().reshape(1,-1)
+    return arr_aux, ROI_labels_dmn['AAL_x']
+
 
 def compute_KNN_graph(matrix, k_degree=10):
-    """ Calculate the adjacency matrix from the connectivity matrix."""
+    ''' 
+    Calculate the adjacency matrix from the connectivity matrix
+    '''
 
     matrix = np.abs(matrix)
     idx = np.argsort(-matrix)[:, 0:k_degree]
@@ -116,14 +138,14 @@ def create_graph(X_train, X_test, y_train, y_test, size=190 ,method={'knn' : 10}
             A = method['knn_group']
 
 
-        # Adding self connections
-        np.fill_diagonal(A,1)
+        # Removing self connections
+        np.fill_diagonal(A,0)
         A = torch.from_numpy(A).float()
         
         # getting the edge_index
-        edge_index, edge_attr = dense_to_sparse(A)
+        edge_index_A, edge_attr_A = dense_to_sparse(A)
         
-        train_data.append(Data(x=Adj, edge_index=edge_index,edge_attr=edge_attr.reshape(len(edge_attr), 1),
+        train_data.append(Data(x=Adj, edge_index=edge_index_A,edge_attr=edge_attr_A.reshape(len(edge_attr_A), 1),
                                y=torch.tensor(int(y_train.iloc[i]))))
 
           
@@ -153,15 +175,14 @@ def create_graph(X_train, X_test, y_train, y_test, size=190 ,method={'knn' : 10}
             A = method['knn_group']
           
         
-        # Adding self connections
-        np.fill_diagonal(A,1)
+        # Removing self connections
+        np.fill_diagonal(A,0)
         A = torch.from_numpy(A).float()
         
         # getting the edge_index
-        edge_index, edge_attr = dense_to_sparse(A)
-        
+        edge_index_A, edge_attr_A = dense_to_sparse(A)
 
-        val_data.append(Data(x=Adj, edge_index=edge_index,edge_attr=edge_attr.reshape(len(edge_attr), 1),
+        val_data.append(Data(x=Adj, edge_index=edge_index_A,edge_attr=edge_attr_A.reshape(len(edge_attr_A), 1),
                              y=torch.tensor(int(y_test.iloc[i]))))
 
     return train_data,val_data
